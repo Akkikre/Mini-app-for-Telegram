@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Барбершоп</title>
+<!-- Подключение Telegram Mini Apps SDK (обязательно) -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#101a2e; --navy2:#18253f; --line:#2a3a5c;
+    --paper:#f1ece2; --muted:#93a0ba; --red:#d6372f; --blue:#2f5fb3;
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Manrope',system-ui,sans-serif;background:var(--navy);color:var(--paper);
+       padding-bottom:110px;min-height:100vh}
+  h1,h2,.price,.time{font-family:'Oswald',sans-serif}
+
+  /* Шапка с полосой барберского столба */
+  .pole{height:10px;background:repeating-linear-gradient(-45deg,var(--red) 0 14px,var(--paper) 14px 28px,var(--blue) 28px 42px,var(--paper) 42px 56px)}
+  header{padding:28px 20px 22px}
+  h1{font-size:44px;line-height:1;font-weight:700;letter-spacing:.5px}
+  header p{color:var(--muted);margin-top:10px;font-size:14px;line-height:1.5;max-width:30ch}
+
+  section{padding:22px 20px 0}
+  h2{font-size:22px;font-weight:500;margin-bottom:12px}
+
+  /* Услуги */
+  .service{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;
+    background:var(--navy2);border:1.5px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;
+    color:inherit;font:inherit;cursor:pointer;transition:border-color .15s,background .15s}
+  .service b{display:block;font-weight:600;font-size:16px}
+  .service small{color:var(--muted);font-size:13px}
+  .price{font-size:20px;white-space:nowrap}
+  .service.on{border-color:var(--red);background:#2a1f2e}
+
+  /* Мастера */
+  .masters{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+  .master{flex:0 0 auto;width:112px;text-align:center;background:var(--navy2);border:1.5px solid var(--line);
+    border-radius:var(--r);padding:14px 8px;color:inherit;font:inherit;cursor:pointer}
+  .ava{width:56px;height:56px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;
+    background:var(--paper);color:var(--navy);font-family:'Oswald';font-size:24px;font-weight:700}
+  .master small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .master.on{border-color:var(--red)}
+
+  /* Дата и время */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .chip{flex:0 0 auto;min-width:58px;text-align:center;background:var(--navy2);border:1.5px solid var(--line);
+    border-radius:12px;padding:10px 8px;color:inherit;font:inherit;cursor:pointer}
+  .chip small{display:block;color:var(--muted);font-size:12px}
+  .chip b{font-family:'Oswald';font-size:20px;font-weight:500}
+  .chip.on{background:var(--paper);color:var(--navy);border-color:var(--paper)}
+  .chip.on small{color:#55607a}
+  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  .slot{padding:11px 0;text-align:center;background:var(--navy2);border:1.5px solid var(--line);border-radius:10px;
+    color:inherit;font-family:'Oswald';font-size:17px;cursor:pointer}
+  .slot.on{background:var(--paper);color:var(--navy);border-color:var(--paper)}
+  .slot:disabled{opacity:.3;text-decoration:line-through;cursor:default}
+
+  /* Нижняя панель */
+  .bar{position:fixed;left:0;right:0;bottom:0;background:var(--navy2);border-top:1px solid var(--line);
+    padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:16px}
+  .sum{flex:1;font-size:13px;color:var(--muted);line-height:1.35}
+  .sum b{display:block;color:var(--paper);font-family:'Oswald';font-size:24px;font-weight:500}
+  .go{background:var(--red);color:#fff;border:0;border-radius:12px;padding:15px 26px;font:700 16px 'Manrope';cursor:pointer}
+  .go:disabled{background:var(--line);color:var(--muted)}
+  :focus-visible{outline:2px solid var(--paper);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="pole"></div>
+<header>
+  <h1 id="shopName"></h1>
+  <p id="shopInfo"></p>
+</header>
+
+<section><h2>Услуги</h2><div id="services"></div></section>
+<section><h2>Мастер</h2><div class="masters" id="masters"></div></section>
+<section><h2>Дата</h2><div class="chips" id="days"></div><div class="slots" id="slots"></div></section>
+
+<div class="bar">
+  <div class="sum" id="sum">Выберите услугу</div>
+  <button class="go" id="go" disabled>Записаться</button>
+</div>
+
+<script>
+/* ============ НАСТРОЙКИ — меняйте под каждого клиента ============ */
+const CONFIG = {
+  name: "Борода & Ножницы",
+  info: "ул. Пушкина, 10 · ежедневно с 10:00 до 21:00",
+  currency: "BYN",
+  workHours: [10, 20],          // первый и последний час записи
+  daysAhead: 7,                 // на сколько дней вперёд можно записаться
+  services: [
+    {id:1, title:"Мужская стрижка", time:"60 мин", price:1500},
+    {id:2, title:"Моделирование бороды", time:"40 мин", price:1000},
+    {id:3, title:"Стрижка + борода", time:"90 мин", price:2200},
+    {id:4, title:"Опасное бритьё", time:"45 мин", price:1200},
+    {id:5, title:"Детская стрижка", time:"40 мин", price:1000}
+  ],
+  masters: [
+    {id:0, name:"Любой", role:"свободный"},
+    {id:1, name:"Артём", role:"топ-барбер"},
+    {id:2, name:"Дмитрий", role:"барбер"}
+  ],
+  busy: ["12:00","15:00"]
+};
+/* ================================================================== */
+
+const tg = window.Telegram?.WebApp;
+if (tg){ tg.ready(); tg.expand(); }
+
+const state = {services:new Set(), master:0, day:null, time:null};
+const $ = id => document.getElementById(id);
+$("shopName").textContent = CONFIG.name;
+$("shopInfo").textContent = CONFIG.info;
+document.title = CONFIG.name;
+
+// Услуги
+CONFIG.services.forEach(s=>{
+  const b = document.createElement("button");
+  b.className = "service";
+  b.innerHTML = `<span><b>${s.title}</b><small>${s.time}</small></span><span class="price">${s.price} ${CONFIG.currency}</span>`;
+  b.onclick = ()=>{ state.services.has(s.id) ? state.services.delete(s.id) : state.services.add(s.id);
+                    b.classList.toggle("on"); update(); };
+  $("services").append(b);
+});
+
+// Мастера
+CONFIG.masters.forEach(m=>{
+  const b = document.createElement("button");
+  b.className = "master" + (m.id===0 ? " on" : "");
+  b.innerHTML = `<div class="ava">${m.id===0?"★":m.name[0]}</div><b>${m.name}</b><small>${m.role}</small>`;
+  b.onclick = ()=>{ state.master = m.id;
+    document.querySelectorAll(".master").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+  $("masters").append(b);
+});
+
+// Дни
+const wd = ["вс","пн","вт","ср","чт","пт","сб"];
+for(let i=0;i<CONFIG.daysAhead;i++){
+  const d = new Date(); d.setDate(d.getDate()+i);
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.innerHTML = `<small>${i===0?"сегодня":wd[d.getDay()]}</small><b>${d.getDate()}</b>`;
+  b.onclick = ()=>{ state.day = d.toISOString().slice(0,10); state.time = null;
+    document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+    renderSlots(); update(); };
+  $("days").append(b);
+}
+
+// Время
+function renderSlots(){
+  $("slots").innerHTML = "";
+  for(let h=CONFIG.workHours[0]; h<=CONFIG.workHours[1]; h++){
+    const t = String(h).padStart(2,"0")+":00";
+    const b = document.createElement("button");
+    b.className = "slot"; b.textContent = t;
+    b.disabled = CONFIG.busy.includes(t);
+    b.onclick = ()=>{ state.time = t;
+      document.querySelectorAll(".slot").forEach(x=>x.classList.remove("on")); b.classList.add("on"); update(); };
+    $("slots").append(b);
+  }
+}
+
+// Итог и кнопка
+function update(){
+  const chosen = CONFIG.services.filter(s=>state.services.has(s.id));
+  const total = chosen.reduce((a,s)=>a+s.price,0);
+  $("sum").innerHTML = chosen.length
+    ? `<b>${total} ${CONFIG.currency}</b>${chosen.length} усл.${state.time?` · ${state.time}`:""}`
+    : "Выберите услугу";
+  $("go").disabled = !(chosen.length && state.day && state.time);
+}
+
+$("go").onclick = ()=>{
+  const order = {
+    services:[...state.services], master:state.master,
+    date:state.day, time:state.time,
+    total:CONFIG.services.filter(s=>state.services.has(s.id)).reduce((a,s)=>a+s.price,0)
+  };
+  if (tg){ tg.sendData(JSON.stringify(order)); }   // уходит боту, мини-апп закроется
+  else { alert("Тест в браузере:\n"+JSON.stringify(order,null,2)); }
+};
+</script>
+</body>
+</html>
